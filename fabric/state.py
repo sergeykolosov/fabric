@@ -278,6 +278,11 @@ env_options = [
         help="Path to SSH config file"
     ),
 
+    make_option('--ssh-controlpath',
+        default=None,
+        help="try SSH connection sharing using the specified ControlPath"
+    ),
+
     make_option('-t', '--timeout',
         type='int',
         default=10,
@@ -367,6 +372,7 @@ env = _AttributeDict({
     'skip_bad_hosts': False,
     'skip_unknown_tasks': False,
     'ssh_config_path': default_ssh_config_path,
+    'ssh_controlpath': None,
     'sudo_passwords': {},
     'ok_ret_codes': [0],     # a list of return codes that indicate success
     # -S so sudo accepts passwd via stdin, -p with our known-value prompt for

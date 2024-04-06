@@ -769,6 +769,19 @@ Allows specification of an alternate SSH configuration file path.
 .. versionadded:: 1.4
 .. seealso:: :option:`--ssh-config-path`, :ref:`ssh-config`
 
+.. _ssh-config-path:
+
+``ssh_controlpath``
+-------------------
+
+**Default:** ``None``
+
+Allows to specify ControlPath, which will enable SSH connection sharing. If
+provided, overrides the ControlPath setting in the SSH configuration file.
+
+.. versionadded:: 1.15.0.post1
+.. seealso:: :option:`--ssh-controlpath`
+
 ``ok_ret_codes``
 ------------------------
 

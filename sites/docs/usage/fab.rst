@@ -343,6 +343,12 @@ below.
     .. versionadded:: 1.4
     .. seealso:: :ref:`ssh-config`
 
+.. cmdoption:: --ssh-controlpath
+
+    Sets :ref:`env.ssh_controlpath <ssh-controlpath>`.
+
+    .. versionadded:: 1.15.0.post1
+
 .. cmdoption:: --skip-bad-hosts
 
     Sets :ref:`env.skip_bad_hosts <skip-bad-hosts>`, causing Fabric to skip

@@ -4,6 +4,7 @@ Classes and subroutines dealing with network connections and related topics.
 
 from functools import wraps
 import getpass
+import inspect
 import os
 import re
 import time
@@ -29,6 +30,12 @@ Please make sure all dependencies are installed and importable.
     sys.stderr.write(msg + '\n')
     sys.exit(1)
 
+
+SSH_CONFIG_LOOKUP_SUPPORTS_EFFECTIVE_OPTIONS = (
+    'effective_options' in inspect.getfullargspec(ssh.SSHConfig.lookup).args
+) if sys.version_info[0] >= 3 else (
+    'effective_options' in inspect.getargspec(ssh.SSHConfig.lookup).args
+)
 
 ipv6_regex = re.compile(
     r'^\[?(?P<host>[0-9A-Fa-f:]+(?:%[a-z]+\d+)?)\]?(:(?P<port>\d+))?$')
@@ -170,7 +177,7 @@ class HostConnectionCache(dict):
         return dict.__contains__(self, normalize_to_string(key))
 
 
-def ssh_config(host_string=None):
+def ssh_config(host_string=None, effective_options=None):
     """
     Return ssh configuration dict for current env.host_string host value.
 
@@ -181,6 +188,11 @@ def ssh_config(host_string=None):
     value of env.ssh_config_path is not a valid file, it will abort.
 
     May give an explicit host string as ``host_string``.
+
+    Optionally accepts ``effective_options``, a `SSHConfigDict` that is passed
+    to `SSHConfig.lookup()` (if the current version of `paramiko` supports it).
+    This object is expected to contain effective values (e.g. `port`, `user`)
+    to be used during parameter expansion in the SSH config.
     """
     from fabric.state import env
     dummy = {}
@@ -197,6 +209,8 @@ def ssh_config(host_string=None):
             warn("Unable to load SSH config file '%s'" % path)
             return dummy
     host = parse_host_string(host_string or env.host_string)['host']
+    if effective_options and SSH_CONFIG_LOOKUP_SUPPORTS_EFFECTIVE_OPTIONS:
+        return env._ssh_config.lookup(host, effective_options=effective_options)
     return env._ssh_config.lookup(host)
 
 
@@ -394,6 +408,33 @@ def normalize_to_string(host_string):
     return join_host_strings(*normalize(host_string))
 
 
+def get_controlpath(user, host, port):
+    from fabric.state import env
+
+    effective_options = ssh.SSHConfigDict(
+        port=port,
+        user=user,
+    )
+    if env.ssh_controlpath is not None:
+        _config = ssh.SSHConfig.from_text("Host %s\nControlPath %s\n" % (host, env.ssh_controlpath))
+        if SSH_CONFIG_LOOKUP_SUPPORTS_EFFECTIVE_OPTIONS:
+            # this is necessary to perform variable expansion (as we allow ssh_controlpath to have variables)
+            _host_config = _config.lookup(host, effective_options=effective_options)
+        else:
+            # fallback, where variable expansion may produce incorrect results
+            _host_config = _config.lookup(host)
+    elif env.use_ssh_config:
+        _host_config = ssh_config(host, effective_options=effective_options)
+    else:
+        _host_config = {}
+
+    controlpath = _host_config.get('controlpath', None)
+    if not controlpath:
+        return None
+
+    return os.path.expanduser(controlpath)
+
+
 def connect(user, host, port, cache, seek_gateway=True):
     """
     Create and return a new SSHClient instance connected to given host.
@@ -467,6 +508,7 @@ def connect(user, host, port, cache, seek_gateway=True):
                 allow_agent=not env.no_agent,
                 look_for_keys=not env.no_keys,
                 sock=sock,
+                controlpath=get_controlpath(user, host, port),
             )
             for suffix in ('auth', 'deleg_creds', 'kex'):
                 name = "gss_" + suffix
